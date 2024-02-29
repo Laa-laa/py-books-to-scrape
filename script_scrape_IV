@@ -1,83 +1,51 @@
+import script_function
 import os
 import random
 import string
 import requests
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
-import time
 
-# Fonction pour extraire les informations d'un livre et télécharger son image
-def scrape_book_info(url):
+# Fonction pour télécharger une image à partir d'une URL et la sauvegarder localement
+def download_image(image_url, category_name):
+    response = requests.get(image_url, stream=True)
+    if response.status_code == 200:
+        # Générer un nom de fichier aléatoire
+        random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        filename = f"{category_name}_{random_str}.png"
+        # Créer le dossier "/images" s'il n'existe pas
+        os.makedirs("images", exist_ok=True)
+        # Sauvegarder l'image dans le dossier "/images" avec le nom généré
+        filepath = os.path.join("images", filename)
+        with open(filepath, 'wb') as f:
+            for chunk in response.iter_content(1024):
+                f.write(chunk)
+        print(f"Image téléchargée : {filename}")
+    else:
+        print(f"Erreur lors du téléchargement de l'image {image_url} :", response.status_code)
+
+# Fonction principale pour scraper tous les livres et télécharger les images de couverture
+def scrape_all_books(url):
     response = requests.get(url)
     if response.status_code == 200:
         soup = BeautifulSoup(response.content, 'html.parser')
-        # Extraire les informations nécessaires
-        product_page_url = url
-        title = soup.find('h1').text.strip()
-        upc = soup.find('th', text='UPC').find_next('td').text.strip() if soup.find('th', text='UPC') else None
-        price_including_tax = soup.find('p', class_='price_color').text.strip()
-        price_excluding_tax = soup.find_all('td')[2].text.strip()
-        availability = soup.find('p', class_='instock availability').text.strip()
-        number_available = ''.join(filter(str.isdigit, availability))  # Extraire le nombre disponible
-        product_description = soup.find('meta', attrs={'name': 'description'})['content'].strip()
-        category = soup.find('ul', class_='breadcrumb').find_all('a')[-1].text.strip()
-        review_rating = soup.find('p', class_='star-rating')['class'][1]
-        image_url = soup.find('div', class_='item active').find('img')['src'].replace('../..', 'https://books.toscrape.com')
-
-        # Télécharger l'image
-        image_filename = f"{category}_{generate_random_string()}.png"
-        image_path = os.path.join("images", image_filename)
-        download_image(image_url, image_path)
-
-        return {
-            'product_page_url': product_page_url,
-            'universal_product_code (upc)': upc,
-            'title': title,
-            'price_including_tax': price_including_tax,
-            'price_excluding_tax': price_excluding_tax,
-            'number_available': number_available,
-            'product_description': product_description,
-            'category': category,
-            'review_rating': review_rating,
-            'image_url': image_url,
-            'image_filename': image_filename  # Ajouter le nom de fichier de l'image aux données
-        }
+        categories = soup.find('ul', class_='nav-list').find_all('a')
+        for category in categories:
+            category_url = urljoin(url, category['href'])
+            category_name = category.text.strip()
+            if category_name == "Books":
+                print("Skipping 'Books' category...")
+                continue
+            print(f"Scraping category: {category_name}")
+            category_books_info = script_function.scrape_category_books(category_url)
+            for book_info in category_books_info:
+                image_url = urljoin(url, book_info['image_url'])
+                download_image(image_url, category_name)
+            script_function.save_to_csv(category_books_info, filename=f"{category_name}.csv")
+            print(f"Category {category_name} scraped and saved successfully.")
     else:
         print("Erreur lors de la requête HTTP :", response.status_code)
-        return None
 
-# Fonction pour télécharger une image depuis une URL
-def download_image(url, filename):
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(filename, 'wb') as file:
-            file.write(response.content)
-        print(f"Image téléchargée avec succès : {filename}")
-    else:
-        print(f"Erreur lors du téléchargement de l'image depuis {url}")
-
-# Fonction pour générer une chaîne aléatoire
-def generate_random_string(length=8):
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
-
-# Fonction pour extraire les informations de chaque livre sur une page
-def extract_books_info(url):
-    response = requests.get(url)
-    books_info = []
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        books = soup.find_all('h3')
-        for book in books:
-            book_link = book.find('a')['href']
-            book_url = url.rsplit('/', 1)[0] + '/' + book_link
-            book_info = scrape_book_info(book_url)
-            if book_info:
-                books_info.append(book_info)
-            time.sleep(1)  # Pause d'une seconde entre chaque requête pour éviter d'être bloqué
-    return books_info
-
-def main():
-    base_url = 'https://books.toscrape.com/catalogue/category/books/mystery_3/index.html'
-    extract_books_info(base_url)
-
+# Exemple d'utilisation
 if __name__ == "__main__":
-    main()
+    scrape_all_books("https://books.toscrape.com")
