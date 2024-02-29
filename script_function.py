@@ -1,27 +1,52 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
+import time
 
-def scrape_books_in_category(category_url):
+# Fonction pour extraire les liens des pages de la catégorie
+def extract_category_pages(url):
+    category_pages = [url]
+    response = requests.get(url)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        next_page = soup.find('li', class_='next')
+        while next_page:
+            next_page_link = next_page.find('a')['href']
+            next_page_url = url.rsplit('/', 1)[0] + '/' + next_page_link
+            category_pages.append(next_page_url)
+            response = requests.get(next_page_url)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
+                next_page = soup.find('li', class_='next')
+            else:
+                break
+    return category_pages
+
+# Fonction pour extraire les informations de chaque livre sur une page
+def extract_books_info(url):
+    response = requests.get(url)
+    books_info = []
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        books = soup.find_all('h3')
+        for book in books:
+            book_link = book.find('a')['href']
+            book_url = url.rsplit('/', 1)[0] + '/' + book_link
+            book_info = scrape_book_info(book_url)
+            if book_info:
+                books_info.append(book_info)
+            time.sleep(1)  # Pause d'une seconde entre chaque requête pour éviter d'être bloqué
+    return books_info
+
+# Fonction pour extraire et sauvegarder les informations de tous les livres d'une catégorie dans un fichier CSV
+def scrape_category_books(url, filename='books_info.csv'):
+    category_pages = extract_category_pages(url)
     all_books_info = []
-    page_number = 1
-    while True:
-        response = requests.get(f"{category_url}/page-{page_number}.html")
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            books = soup.find_all('h3')
-            if len(books) == 0:
-                break  # Pas de livres sur cette page, donc fin de la pagination
-            for book in books:
-                book_link = book.find('a')['href']
-                book_info = scrape_book_info(f"{category_url}/{book_link}")
-                if book_info:
-                    all_books_info.append(book_info)
-            page_number += 1
-        else:
-            print("Erreur lors de la requête HTTP :", response.status_code)
-            break
-    return all_books_info
+    for page in category_pages:
+        books_info = extract_books_info(page)
+        all_books_info.extend(books_info)
+    save_to_csv(all_books_info, filename)
+
 
 
 def scrape_book_info(url):
