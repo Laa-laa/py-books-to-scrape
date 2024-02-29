@@ -4,25 +4,6 @@ import csv
 import time
 import os
 
-# Fonction principale pour scraper tous les livres et sauvegarder les données par catégorie
-def scrape_all_books(url):
-    response = requests.get(url)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        categories = soup.find('ul', class_='nav-list').find_all('a')
-        for category in categories:
-            category_url = url.rsplit('/', 1)[0] + '/' + category['href']
-            category_name = category.text.strip()
-            if category_name == "Books":
-                print("Skipping 'Books' category...")
-                continue
-            print(f"Scraping category: {category_name}")
-            category_books_info = scrape_category_books(category_url)
-            save_to_csv(category_books_info, category_name, "all_books_csv")
-            print(f"Category {category_name} scraped and saved successfully.")
-    else:
-        print("Erreur lors de la requête HTTP :", response.status_code)
-
 # Fonction pour extraire les liens des pages de la catégorie
 def extract_category_pages(url):
     category_pages = [url]
