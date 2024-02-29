@@ -39,13 +39,13 @@ def extract_books_info(url):
     return books_info
 
 # Fonction pour extraire et sauvegarder les informations de tous les livres d'une catégorie dans un fichier CSV
-def scrape_category_books(url, filename='books_info.csv'):
+def scrape_category_books(url):
     category_pages = extract_category_pages(url)
     all_books_info = []
     for page in category_pages:
         books_info = extract_books_info(page)
         all_books_info.extend(books_info)
-    save_to_csv(all_books_info, filename)
+    return all_books_info
 
 
 

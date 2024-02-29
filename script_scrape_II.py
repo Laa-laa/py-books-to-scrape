@@ -1,7 +1,7 @@
 import script_function
 
 def main():
-    category_url = 'https://books.toscrape.com/catalogue/category/books/travel_2/index.html'
+    category_url = 'https://books.toscrape.com/catalogue/category/books/mystery_3/index.html'
     all_books_info = script_function.scrape_category_books(category_url)
     if all_books_info:
         script_function.save_to_csv(all_books_info)
